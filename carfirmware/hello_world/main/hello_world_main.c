@@ -41,42 +41,6 @@ static void example_wifi_init(void)
 
 PRIVILEGED_DATA static portMUX_TYPE xKernelLock = portMUX_INITIALIZER_UNLOCKED;
 
-int servo_pos=1000;
-int servo_max=2000;
-int servo_min=1000;
-
-void servo_task_fun(){
-    int servo_change=15;
-    TickType_t xLastWakeTime=xTaskGetTickCount();
-    while(1){
-        //Enter critical section
-        taskENTER_CRITICAL(&xKernelLock);
-        //set the servo to the current position
-        gpio_set_level(2, 1);
-        //get a current mictosecond counter
-        int64_t start=esp_timer_get_time();
-        int64_t stop=start;
-        //wait for 1ms
-        while(stop-start<servo_pos){
-            stop=esp_timer_get_time();
-        }
-        gpio_set_level(2, 0);
-
-        servo_pos+=servo_change;
-        if(servo_pos>servo_max){
-            servo_change*=-1;
-            servo_pos=servo_max;
-        }
-        if(servo_pos<servo_min){
-            servo_change*=-1;
-            servo_pos=servo_min;
-        }
-        taskEXIT_CRITICAL(&xKernelLock);
-        vTaskDelayUntil(&xLastWakeTime, 2);
-        // printf("SP: %d\n", servo_pos);
-    }
-}
-
 void ultrasonic_task_fun(){
     TickType_t xLastWakeTime=xTaskGetTickCount();
     while(1){
@@ -168,6 +132,10 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, in
   printf("Bytes received: %f",data->d);
 }
 
+//serious functions from here
+
+#include "servoposition.h"
+#include "udar.h"
 
 void app_main(void)
 {
@@ -175,61 +143,65 @@ void app_main(void)
 
     printf("Hello world!\n");
 
-    nvs_flash_init();
-    example_wifi_init();
-    printf("WiFi initialized\n");
+    //WIFI Stuff
+    // nvs_flash_init();
+    // example_wifi_init();
+    // printf("WiFi initialized\n");
 
-    uint8_t baseMac[6];
-    esp_err_t ret = esp_wifi_get_mac(WIFI_IF_STA, baseMac);
-    if (ret == ESP_OK) {
-        printf("%02x:%02x:%02x:%02x:%02x:%02x\n",
-                    baseMac[0], baseMac[1], baseMac[2],
-                    baseMac[3], baseMac[4], baseMac[5]);
-    }
+    // uint8_t baseMac[6];
+    // esp_err_t ret = esp_wifi_get_mac(WIFI_IF_STA, baseMac);
+    // if (ret == ESP_OK) {
+    //     printf("%02x:%02x:%02x:%02x:%02x:%02x\n",
+    //                 baseMac[0], baseMac[1], baseMac[2],
+    //                 baseMac[3], baseMac[4], baseMac[5]);
+    // }
 
-    // Init ESP-NOW
-    if (esp_now_init() != ESP_OK) {
-        printf("Error initializing ESP-NOW");
-    }
+    // // Init ESP-NOW
+    // if (esp_now_init() != ESP_OK) {
+    //     printf("Error initializing ESP-NOW");
+    // }
 
 
-    esp_now_register_send_cb(OnDataSent);
+    // esp_now_register_send_cb(OnDataSent);
 
-    esp_now_peer_info_t peerInfo={};
-    memcpy(peerInfo.peer_addr, broadcastAddress, 6);
-    peerInfo.channel = 7;
-    peerInfo.encrypt = false;
+    // esp_now_peer_info_t peerInfo={};
+    // memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+    // peerInfo.channel = 7;
+    // peerInfo.encrypt = false;
 
-    // Add peer        
-    if (esp_now_add_peer(&peerInfo) != ESP_OK){
-        printf("Failed to add peer\n");
-    }
-    printf("Peer added\n");
+    // // Add peer        
+    // if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    //     printf("Failed to add peer\n");
+    // }
+    // printf("Peer added\n");
 
-    esp_now_register_recv_cb(OnDataRecv);
+    // esp_now_register_recv_cb(OnDataRecv);
 
-    struct struct_message myData;
-    myData.d = 42;
+    // struct struct_message myData;
+    // myData.d = 42;
 
-    while (1)
-    {
-            esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
-            printf("Send Status: %d\n", result);
-    printf("ESP-OK: %d\n", ESP_OK);
-            vTaskDelay(100);
-    }
+    // while (1)
+    // {
+    //         esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
+    //         printf("Send Status: %d\n", result);
+    // printf("ESP-OK: %d\n", ESP_OK);
+    //         vTaskDelay(100);
+    // }
+    //EOF WIFI Stuff
 
 
     //Configure GPIO 1 as output
     // gpio_set_direction(1, GPIO_MODE_OUTPUT);
     // gpio_set_direction(2, GPIO_MODE_INPUT);
     //Servo
-    gpio_set_direction(3, GPIO_MODE_OUTPUT);
-    gpio_set_direction(4, GPIO_MODE_INPUT);
+    // gpio_set_direction(3, GPIO_MODE_OUTPUT);
+    // gpio_set_direction(4, GPIO_MODE_INPUT);
+    //Servo Pin
     gpio_set_direction(2, GPIO_MODE_OUTPUT);
     // gpio_set_level(4, 0);
 
-    // xTaskCreate(servo_task_fun, "servo_task", 2048, NULL, 5, NULL);
+    xTaskCreate(servo_position_task_function, "servo_position_task", 2048, NULL, 5, NULL);
+    xTaskCreate(udar_control_task, "servo_turn_task", 2048, NULL, 4, NULL);
     // xTaskCreate(ultrasonic_task_fun, "ultrasonic_task", 2048, NULL, 1, NULL);
     // xTaskCreate(led_task, "led_task", 4096, NULL, 6, NULL);
 

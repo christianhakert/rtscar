@@ -22,6 +22,7 @@ SemaphoreHandle_t next_notify;
 SemaphoreHandle_t notify_sync_mutex;
 
 void set_servo_position(double pos, SemaphoreHandle_t l_notify_semaphore){
+    pos = pos * -1.0;
     if (pos < -45){
         pos = -45;
     }

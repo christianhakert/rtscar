@@ -136,6 +136,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, in
 
 #include "servoposition.h"
 #include "udar.h"
+#include "ultrasonic.h"
+#include "enginepwm.h"
 
 void app_main(void)
 {
@@ -198,17 +200,26 @@ void app_main(void)
     // gpio_set_direction(4, GPIO_MODE_INPUT);
     //Servo Pin
     gpio_set_direction(2, GPIO_MODE_OUTPUT);
+    //Ultrasonic Pins
+    gpio_set_direction(ULTRASONIC_ECHO_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(ULTRASONIC_TRIG_PIN, GPIO_MODE_OUTPUT);
     // gpio_set_level(4, 0);
 
     xTaskCreate(servo_position_task_function, "servo_position_task", 2048, NULL, 5, NULL);
     xTaskCreate(udar_control_task, "servo_turn_task", 2048, NULL, 4, NULL);
-    // xTaskCreate(ultrasonic_task_fun, "ultrasonic_task", 2048, NULL, 1, NULL);
+
+    // setup_engine_pwm();
+
+
     // xTaskCreate(led_task, "led_task", 4096, NULL, 6, NULL);
 
     // gpio_set_direction(1, GPIO_MODE_OUTPUT);
     // gpio_set_direction(15, GPIO_MODE_OUTPUT);
 
     // int enginestat=0;
+
+    // gpio_set_level(1, 1);
+    // gpio_set_level(15, 1);
 
     // while(1){
     //     gpio_set_level(15, !enginestat);

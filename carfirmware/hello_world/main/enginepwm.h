@@ -4,8 +4,6 @@
 #define ENGINE_GPIO_A 1
 #define ENGINE_GPIO_B 15
 
-//m/s
-#define FULLSPEED 0.5
 
 void setup_engine_A(int level);
 void setup_engine_B(int level);

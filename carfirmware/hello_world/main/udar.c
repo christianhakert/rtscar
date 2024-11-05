@@ -11,6 +11,10 @@ double udar_map[UDAR_MAP_SIZE];
 double current_position=0;
 int current_direction=SCAN_ANGLE_INTV;
 
+double *get_udar_map(){
+    return udar_map;
+}
+
 void set_next_position(){
     current_position+=current_direction;
     if (current_position >= 45){
@@ -52,24 +56,24 @@ void udar_control_task(){
         int idx=(current_position+45)/SCAN_ANGLE_INTV;
         udar_map[idx]=distance;
         
-        printf("UDAR Map:\n");
-        for (int i=0; i<UDAR_MAP_SIZE; i++){
-            printf("%d: %f: ", i, udar_map[i]);
-            int emptypos=udar_map[i];
-            if (emptypos>50){
-                emptypos=50;
-            }
-            int full_pos=50-emptypos;
-            for(int x=0;x<emptypos;x++){
-                printf(" ");
-            }
-            for(int x=0;x<full_pos;x++){
-                printf("#");
-            }
-            printf("\n");
-        }
-        //Clear the terminal
-        printf("\033[2J\033[1;1H");
+        // printf("UDAR Map:\n");
+        // for (int i=0; i<UDAR_MAP_SIZE; i++){
+        //     printf("%d: %f: ", i, udar_map[i]);
+        //     int emptypos=udar_map[i];
+        //     if (emptypos>50){
+        //         emptypos=50;
+        //     }
+        //     int full_pos=50-emptypos;
+        //     for(int x=0;x<emptypos;x++){
+        //         printf(" ");
+        //     }
+        //     for(int x=0;x<full_pos;x++){
+        //         printf("#");
+        //     }
+        //     printf("\n");
+        // }
+        // //Clear the terminal
+        // printf("\033[2J\033[1;1H");
         
         vTaskDelayUntil(&xLastWakeTime, UDAR_PERIOD/portTICK_PERIOD_MS);
     }

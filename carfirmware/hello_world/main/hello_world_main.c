@@ -68,6 +68,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, in
 #include "udar.h"
 #include "ultrasonic.h"
 #include "enginepwm.h"
+#include "steering.h"
 
 void app_main(void)
 {
@@ -137,8 +138,9 @@ void app_main(void)
 
     xTaskCreate(servo_position_task_function, "servo_position_task", 2048, NULL, 5, NULL);
     xTaskCreate(udar_control_task, "servo_turn_task", 2048, NULL, 4, NULL);
+    xTaskCreate(steering_task, "steering_task", 2048, NULL, 1, NULL);
 
-    // setup_engine_pwm();
+    setup_engine_pwm();
 
 
     // xTaskCreate(led_task, "led_task", 4096, NULL, 6, NULL);

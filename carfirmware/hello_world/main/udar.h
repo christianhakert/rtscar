@@ -1,8 +1,8 @@
 #pragma once
 
-#define UDAR_PERIOD 1000
+#define UDAR_PERIOD 100
 
-#define SCAN_ANGLE_INTV 15
+#define SCAN_ANGLE_INTV 10
 
 #define UDAR_MAP_SIZE ((90/SCAN_ANGLE_INTV)+1)
 

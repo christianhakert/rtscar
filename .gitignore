@@ -1,2 +1,4 @@
 esp-idf
 build
+watchy_firmware/esp/**
+managed_components

@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "Wire.h"
+#include "bma.h"
 #include "esp_attr.h"
 #include "esp_cpu.h"
 #include "esp_log.h"
@@ -34,6 +36,125 @@
 #define DISPLAY_BUSY 19
 
 GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> display(WatchyDisplay(DISPLAY_CS, DISPLAY_DC, DISPLAY_RES, DISPLAY_BUSY));
+
+BMA423 sensor;
+uint16_t _readRegister(uint8_t address, uint8_t reg, uint8_t *data,
+                       uint16_t len) {
+    Wire.beginTransmission(address);
+    Wire.write(reg);
+    Wire.endTransmission();
+    Wire.requestFrom((uint8_t)address, (uint8_t)len);
+    uint8_t i = 0;
+    while (Wire.available()) {
+        data[i++] = Wire.read();
+    }
+    return 0;
+}
+
+uint16_t _writeRegister(uint8_t address, uint8_t reg, uint8_t *data,
+                        uint16_t len) {
+    Wire.beginTransmission(address);
+    Wire.write(reg);
+    Wire.write(data, len);
+    return (0 != Wire.endTransmission());
+}
+
+void _bmaConfig() {
+    Wire.begin(SDA, SCL);
+
+    if (sensor.begin(_readRegister, _writeRegister, delay) == false) {
+        // fail to init BMA
+        return;
+    }
+
+    // Accel parameter structure
+    Acfg cfg;
+    /*!
+        Output data rate in Hz, Optional parameters:
+            - BMA4_OUTPUT_DATA_RATE_0_78HZ
+            - BMA4_OUTPUT_DATA_RATE_1_56HZ
+            - BMA4_OUTPUT_DATA_RATE_3_12HZ
+            - BMA4_OUTPUT_DATA_RATE_6_25HZ
+            - BMA4_OUTPUT_DATA_RATE_12_5HZ
+            - BMA4_OUTPUT_DATA_RATE_25HZ
+            - BMA4_OUTPUT_DATA_RATE_50HZ
+            - BMA4_OUTPUT_DATA_RATE_100HZ
+            - BMA4_OUTPUT_DATA_RATE_200HZ
+            - BMA4_OUTPUT_DATA_RATE_400HZ
+            - BMA4_OUTPUT_DATA_RATE_800HZ
+            - BMA4_OUTPUT_DATA_RATE_1600HZ
+    */
+    cfg.odr = BMA4_OUTPUT_DATA_RATE_100HZ;
+    /*!
+        G-range, Optional parameters:
+            - BMA4_ACCEL_RANGE_2G
+            - BMA4_ACCEL_RANGE_4G
+            - BMA4_ACCEL_RANGE_8G
+            - BMA4_ACCEL_RANGE_16G
+    */
+    cfg.range = BMA4_ACCEL_RANGE_2G;
+    /*!
+        Bandwidth parameter, determines filter configuration, Optional parameters:
+            - BMA4_ACCEL_OSR4_AVG1
+            - BMA4_ACCEL_OSR2_AVG2
+            - BMA4_ACCEL_NORMAL_AVG4
+            - BMA4_ACCEL_CIC_AVG8
+            - BMA4_ACCEL_RES_AVG16
+            - BMA4_ACCEL_RES_AVG32
+            - BMA4_ACCEL_RES_AVG64
+            - BMA4_ACCEL_RES_AVG128
+    */
+    cfg.bandwidth = BMA4_ACCEL_NORMAL_AVG4;
+
+    /*! Filter performance mode , Optional parameters:
+        - BMA4_CIC_AVG_MODE
+        - BMA4_CONTINUOUS_MODE
+    */
+    cfg.perf_mode = BMA4_CONTINUOUS_MODE;
+
+    // Configure the BMA423 accelerometer
+    sensor.setAccelConfig(cfg);
+
+    // Enable BMA423 accelerometer
+    // Warning : Need to use feature, you must first enable the accelerometer
+    // Warning : Need to use feature, you must first enable the accelerometer
+    sensor.enableAccel();
+
+    struct bma4_int_pin_config config;
+    config.edge_ctrl = BMA4_LEVEL_TRIGGER;
+    config.lvl = BMA4_ACTIVE_HIGH;
+    config.od = BMA4_PUSH_PULL;
+    config.output_en = BMA4_OUTPUT_ENABLE;
+    config.input_en = BMA4_INPUT_DISABLE;
+    // The correct trigger interrupt needs to be configured as needed
+    sensor.setINTPinConfig(config, BMA4_INTR1_MAP);
+
+    struct bma423_axes_remap remap_data;
+    remap_data.x_axis = 1;
+    remap_data.x_axis_sign = 0xFF;
+    remap_data.y_axis = 0;
+    remap_data.y_axis_sign = 0xFF;
+    remap_data.z_axis = 2;
+    remap_data.z_axis_sign = 0xFF;
+    // Need to raise the wrist function, need to set the correct axis
+    sensor.setRemapAxes(&remap_data);
+
+    // Enable BMA423 isStepCounter feature
+    sensor.enableFeature(BMA423_STEP_CNTR, true);
+    // Enable BMA423 isTilt feature
+    sensor.enableFeature(BMA423_TILT, true);
+    // Enable BMA423 isDoubleClick feature
+    sensor.enableFeature(BMA423_WAKEUP, true);
+
+    // Reset steps
+    sensor.resetStepCounter();
+
+    // Turn on feature interrupt
+    sensor.enableStepCountInterrupt();
+    sensor.enableTiltInterrupt();
+    // It corresponds to isDoubleClick interrupt
+    sensor.enableWakeupInterrupt();
+}
 
 void initDisplay(void *pvParameters) {
     ESP_LOGI("initDisplay", "initializing display");
@@ -159,6 +280,89 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
     printf(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
+void accel_task(void *pvParameters) {
+    _bmaConfig();
+
+    while (1) {
+        Accel acc;
+        // Get acceleration data
+        bool res = sensor.getAccel(acc);
+        uint8_t direction = sensor.getDirection();
+
+        // -x nach vorne neigen
+        // x nach hinten neigen
+        // y nach links neigen
+        // -y nach rechts neigen
+        // 90° Neigung = 1000
+        if (res == false) {
+            printf("getAccel FAIL\n");
+        } else {
+            switch (direction) {
+                case DIRECTION_DISP_DOWN:
+                    printf("(%d,%d,%d) FACE DOWN\n", acc.x, acc.y, acc.z);
+                    break;
+                case DIRECTION_DISP_UP:
+                    printf("(%d,%d,%d) FACE UP\n", acc.x, acc.y, acc.z);
+                    break;
+                case DIRECTION_BOTTOM_EDGE:
+                    printf("(%d,%d,%d) BOTTOM EDGE\n", acc.x, acc.y, acc.z);
+                    break;
+                case DIRECTION_TOP_EDGE:
+                    printf("(%d,%d,%d) TOP EDGE\n", acc.x, acc.y, acc.z);
+                    break;
+                case DIRECTION_RIGHT_EDGE:
+                    printf("(%d,%d,%d) RIGHT EDGE\n", acc.x, acc.y, acc.z);
+                    break;
+                case DIRECTION_LEFT_EDGE:
+                    printf("(%d,%d,%d) LEFT EDGE\n", acc.x, acc.y, acc.z);
+                    break;
+                default:
+                    printf("(%d,%d,%d) ERROR\n", acc.x, acc.y, acc.z);
+                    break;
+            }
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+void map_task(void *pvParameters) {
+    while (1) {
+        struct car2watch incomingData;
+        incomingData.magic = 0x42;
+        incomingData.angle_granularity = 5;
+        // generate random number for udar_map
+        for (size_t i = 0; i < 90 / incomingData.angle_granularity + 1; i++) {
+            incomingData.udar_map[i] = rand() % 50 + 20;
+        }
+
+        // incomingData.udar_map[0] = random; // in cm
+        // show only up to 1 m
+        // 0,0 is top left corner
+        int car_x = 100;
+        int car_y = 150;
+        display.fillRect(0, 0, 200, 200, GxEPD_WHITE);
+        display.fillCircle(car_x, car_y, 5, GxEPD_BLACK);
+        for (size_t i = 0; i < 90 / incomingData.angle_granularity + 1; i++) {
+            double angle = 45 + (double)i * (double)incomingData.angle_granularity;
+            double angle_line = (double)angle + (double)90;
+            double line_length = incomingData.angle_granularity;
+            int x = incomingData.udar_map[i] * cos(angle * DEG_TO_RAD);
+            int y = incomingData.udar_map[i] * sin(angle * DEG_TO_RAD);
+            // printf("dist: %f, x: %d, y: %d\n", incomingData.udar_map[i], x, y);
+            int x_start = car_x - x - line_length / 2 * cos(angle_line * DEG_TO_RAD);
+            int y_start = car_y - y - line_length / 2 * sin(angle_line * DEG_TO_RAD);
+            int x_end = car_x - x + line_length / 2 * cos(angle_line * DEG_TO_RAD);
+            int y_end = car_y - y + line_length / 2 * sin(angle_line * DEG_TO_RAD);
+            display.drawLine(x_start, y_start, x_end, y_end, GxEPD_BLACK);
+        }
+
+        display.display(true);
+        // printf("updated map\n");
+
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    }
+}
+
 void setup(void *pvParameters) {
     initDisplay(NULL);
 
@@ -191,56 +395,10 @@ void setup(void *pvParameters) {
     printf("Send Status: %d\n", result);
     printf("ESP-OK: %d\n", ESP_OK);
 
-    vTaskDelay(200);
-    // }
+    xTaskCreate(accel_task, "accel_task", 4096, NULL, 4, NULL);
+    xTaskCreate(map_task, "map_task", 4096, NULL, 5, NULL);
 
-    while (1) {
-        struct car2watch incomingData;
-        incomingData.magic = 0x42;
-        incomingData.angle_granularity = 5;
-        // generate random number for udar_map
-        for (size_t i = 0; i < 90 / incomingData.angle_granularity + 1; i++) {
-            incomingData.udar_map[i] = rand() % 50+20;
-        }
-
-        // incomingData.udar_map[0] = random; // in cm
-        // show only up to 1 m
-        // 0,0 is top left corner
-        int car_x = 100;
-        int car_y = 150;
-        display.fillRect(0, 0, 200, 200, GxEPD_WHITE);
-        display.fillCircle(car_x, car_y, 5, GxEPD_BLACK);
-        // for (size_t i = 0; i < 90 / incomingData.angle_granularity + 1; i++) {
-        //     int x = incomingData.udar_map[i] * cos(-45 + i * incomingData.angle_granularity);
-        //     int y = incomingData.udar_map[i] * sin(-45 + i * incomingData.angle_granularity);
-        //     // printf("dist: %f, x: %d, y: %d\n", incomingData.udar_map[i],x, y);
-        //     display.fillRect(car_x-x, car_y-y, incomingData.angle_granularity, 5, GxEPD_BLACK);
-        //     printf("dist: %f, x: %d, y: %d\n", incomingData.udar_map[i],car_x-x, car_y-y);
-        // }
-        for (size_t i = 0; i < 90 / incomingData.angle_granularity + 1; i++) {
-            // for (size_t i = 0; i < 1; i++) {
-            // int x = incomingData.udar_map[i] * cos(-45 + i * incomingData.angle_granularity);
-            // int y = incomingData.udar_map[i] * sin(-45 + i * incomingData.angle_granularity);
-            // // printf("dist: %f, x: %d, y: %d\n", incomingData.udar_map[i],x, y);
-            // display.fillRect(car_x-x, car_y-y, incomingData.angle_granularity, 5, GxEPD_BLACK);
-            double angle = 45+(double)i * (double)incomingData.angle_granularity;
-            double angle_line = (double)angle + (double)90;
-            double line_length = incomingData.angle_granularity;
-            int x = incomingData.udar_map[i] * cos(angle * DEG_TO_RAD);
-            int y = incomingData.udar_map[i] * sin(angle * DEG_TO_RAD);
-            printf("dist: %f, x: %d, y: %d\n", incomingData.udar_map[i], x, y);
-            int x_start = car_x - x - line_length / 2 * cos(angle_line * DEG_TO_RAD);
-            int y_start = car_y - y - line_length / 2 * sin(angle_line * DEG_TO_RAD);
-            int x_end = car_x - x + line_length / 2 * cos(angle_line * DEG_TO_RAD);
-            int y_end = car_y - y + line_length / 2 * sin(angle_line * DEG_TO_RAD);
-            display.drawLine(x_start, y_start, x_end, y_end, GxEPD_BLACK);
-        }
-
-        display.display(true);
-
-        vTaskDelay(2000);
-        printf("updated map\n");
-    }
+    vTaskDelete(NULL);
 }
 
 extern "C" void app_main() {

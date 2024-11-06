@@ -31,6 +31,7 @@ double udar_map[90];
 // 68:b6:b3:3e:34:e8
 uint8_t broadcastAddress[] = {0x68, 0xb6, 0xb3, 0x3e, 0x34, 0xe8};
 
+bool initial = true;
 bool motor_on = false;
 bool kaputt = false;
 bool freedom = false;
@@ -205,21 +206,16 @@ void motor_task(void *pvParameters) {
     while (1) {
         if (xSemaphoreTake(xSemaphoreMotorControl, portMAX_DELAY) == pdTRUE) {
             if (motor_on) {
-                printf("Motor on\n");
-                display.fillScreen(GxEPD_WHITE);
-                display.fillRect(190, 10, 10, 30, GxEPD_BLACK);
-                if (kaputt) {
-                    display.fillRect(0, 190, 20, 10, GxEPD_BLACK);
+                if (initial) {
+                    initial = false;
+                    display.fillScreen(GxEPD_WHITE);
                 }
+                printf("Motor on\n");
+                display.fillRect(190, 10, 10, 30, GxEPD_BLACK);
                 display.display(true);
             } else {
                 printf("Motor off\n");
                 display.fillRect(190, 10, 10, 30, GxEPD_WHITE);
-                // display.fillScreen(GxEPD_WHITE);
-                // display.setTextColor(GxEPD_BLACK);
-                // display.setFont(&FreeMonoBold18pt7b);
-                // display.setCursor(0, 75);
-                // display.print("Press\nTop Right\nto Start!");
                 display.display(true);
             }
         }
@@ -230,11 +226,7 @@ void kaputt_task(void *pvParameters) {
         if (xSemaphoreTake(xSemaphoreKaputt, portMAX_DELAY) == pdTRUE) {
             if (kaputt) {
                 printf("Kaputt on\n");
-                display.fillScreen(GxEPD_WHITE);
                 display.fillRect(0, 190, 20, 10, GxEPD_BLACK);
-                if (motor_on) {
-                    display.fillRect(190, 10, 10, 30, GxEPD_BLACK);
-                }
                 display.display(true);
             } else {
                 printf("Kaputt off\n");
@@ -249,8 +241,12 @@ void freedom_task(void *pvParameters) {
         if (xSemaphoreTake(xSemaphoreFreedom, portMAX_DELAY) == pdTRUE) {
             if (freedom) {
                 printf("FREEDOM on\n");
+                display.fillRect(0, 10, 10, 30, GxEPD_BLACK);
+                display.display(true);
             } else {
                 printf("FREEDOM off\n");
+                display.fillRect(0, 10, 10, 30, GxEPD_WHITE);
+                display.display(true);
             }
         }
     }
@@ -286,12 +282,16 @@ void setup(void *pvParameters) {
     vTaskDelete(NULL);
 }
 static void toggle_kaputt(void *args) {
-    kaputt = !kaputt;
-    xSemaphoreGiveFromISR(xSemaphoreKaputt, NULL);
+    if (!initial) {
+        kaputt = !kaputt;
+        xSemaphoreGiveFromISR(xSemaphoreKaputt, NULL);
+    }
 }
 static void toggle_freedom(void *args) {
-    freedom = !freedom;
-    xSemaphoreGiveFromISR(xSemaphoreFreedom, NULL);
+    if (!initial) {
+        freedom = !freedom;
+        xSemaphoreGiveFromISR(xSemaphoreFreedom, NULL);
+    }
 }
 static void toggle_motor(void *args) {
     motor_on = !motor_on;

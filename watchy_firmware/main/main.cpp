@@ -22,7 +22,7 @@ GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> display(WatchyDisplay(DISPLAY_CS
 
 BMA423 sensor;
 
-SemaphoreHandle_t xSemaphoreCarUpdate, xSemaphoreMotorControl, xSemaphoreKaputt;
+SemaphoreHandle_t xSemaphoreCarUpdate, xSemaphoreMotorControl, xSemaphoreKaputt, xSemaphoreFreedom;
 
 unsigned int angle_granularity;
 double udar_map[90];
@@ -246,7 +246,7 @@ void kaputt_task(void *pvParameters) {
 }
 void freedom_task(void *pvParameters) {
     while (1) {
-        if (xSemaphoreTake(xSemaphoreKaputt, portMAX_DELAY) == pdTRUE) {
+        if (xSemaphoreTake(xSemaphoreFreedom, portMAX_DELAY) == pdTRUE) {
             if (freedom) {
                 printf("FREEDOM on\n");
             } else {

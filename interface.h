@@ -9,4 +9,5 @@ unsigned long magic; //0x42
 unsigned int speed; // [0,100]
 double direction; // angle/s [-90°/s,90] -45° links
 int kaputt;
+int freedom;
 };

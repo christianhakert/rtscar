@@ -33,7 +33,7 @@ uint8_t broadcastAddress[] = {0x68, 0xb6, 0xb3, 0x3e, 0x34, 0xe8};
 
 bool motor_on = false;
 bool kaputt = false;
-int freedom = 0;
+bool freedom = false;
 
 void initDisplay(void *pvParameters) {
     ESP_LOGI("initDisplay", "initializing display");
@@ -192,11 +192,8 @@ void accel_task(void *pvParameters) {
             data.magic = 0x42;
             data.speed = speed;
             data.direction = direction;
-            if (freedom) {
-                data.kaputt = -1;
-            } else {
-                data.kaputt = kaputt;
-            }
+            data.kaputt = kaputt;
+            data.freedom = freedom;
 
             ESP_ERROR_CHECK(esp_now_send(broadcastAddress, (uint8_t *)&data, sizeof(data)));
         }
@@ -247,6 +244,17 @@ void kaputt_task(void *pvParameters) {
         }
     }
 }
+void freedom_task(void *pvParameters) {
+    while (1) {
+        if (xSemaphoreTake(xSemaphoreKaputt, portMAX_DELAY) == pdTRUE) {
+            if (freedom) {
+                printf("FREEDOM on\n");
+            } else {
+                printf("FREEDOM off\n");
+            }
+        }
+    }
+}
 
 void setup(void *pvParameters) {
     initDisplay(NULL);
@@ -273,7 +281,7 @@ void setup(void *pvParameters) {
     xTaskCreate(motor_task, "motor_task", 4096, NULL, 5, NULL);
     xTaskCreate(accel_task, "accel_task", 4096, NULL, 4, NULL);
     xTaskCreate(map_task, "map_task", 4096, NULL, 3, NULL);
-    xTaskCreate(kaputt_task, "freedom_task", 4096, NULL, 2, NULL);
+    xTaskCreate(freedom_task, "freedom_task", 4096, NULL, 2, NULL);
 
     vTaskDelete(NULL);
 }
@@ -306,8 +314,14 @@ extern "C" void app_main() {
         ESP_LOGE("app_main", "insufficient heap for semaphore");
         abort();
     }
+    if ((xSemaphoreFreedom = xSemaphoreCreateBinary()) == NULL) {
+        ESP_LOGE("app_main", "insufficient heap for semaphore");
+        abort();
+    }
     /* register interrupts */
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
+    ESP_ERROR_CHECK(gpio_set_intr_type((gpio_num_t)BOTTOM_RIGHT, GPIO_INTR_NEGEDGE));
+    ESP_ERROR_CHECK(gpio_isr_handler_add((gpio_num_t)BOTTOM_RIGHT, toggle_freedom, NULL));
     ESP_ERROR_CHECK(gpio_set_intr_type((gpio_num_t)BOTTOM_LEFT, GPIO_INTR_NEGEDGE));
     ESP_ERROR_CHECK(gpio_isr_handler_add((gpio_num_t)BOTTOM_LEFT, toggle_kaputt, NULL));
     ESP_ERROR_CHECK(gpio_set_intr_type((gpio_num_t)TOP_RIGHT, GPIO_INTR_NEGEDGE));

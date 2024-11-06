@@ -6,3 +6,5 @@
 void update_steering_input(unsigned int speed, double direction);
 
 void steering_task();
+
+void set_freedom_mode(int freedom);

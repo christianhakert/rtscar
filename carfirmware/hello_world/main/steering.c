@@ -10,6 +10,12 @@ double s_direction;
 
 double brake_factor=1;
 
+double freedom_mode=0;
+
+void set_freedom_mode(int freedom){
+    freedom_mode=freedom;
+}
+
 #define PI 3.14159265358979323846
 
 void update_steering_input(unsigned int speed, double direction){
@@ -115,7 +121,12 @@ void steering_task(){
     TickType_t xLastWakeTime=xTaskGetTickCount();
     // update_steering_input(90, -1);
     while(1){
-        predict_collisions();
+        if(freedom_mode){
+            brake_factor=1;
+        }
+        else{
+            predict_collisions();
+        }
         update_engs();
 
         vTaskDelayUntil(&xLastWakeTime, 500/portTICK_PERIOD_MS);

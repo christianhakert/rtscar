@@ -65,11 +65,18 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, in
         printf("Set direction to %f\n",data->direction);
         update_steering_input(data->speed,data->direction);
 
-        if(data->kaputt){
+        if(data->kaputt == 1){
             printf("Kaputt\n");
             g_kaputt=1;
         } else {
             g_kaputt=0;
+        }
+
+        if(data->freedom == 1){
+            printf("Freedom mode\n");
+            set_freedom_mode(1);
+        } else {
+            set_freedom_mode(0);
         }
     }
 }

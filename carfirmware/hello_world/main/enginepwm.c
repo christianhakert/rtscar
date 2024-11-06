@@ -14,7 +14,7 @@ int engine_B_level=50;
 int engine_A_cnt=0;
 int engine_B_cnt=0;
 
-#define DUTY_MIN 700
+#define DUTY_MIN 800
 #define DUTY_MAX 1024
 
 void setup_engine_A(int level){

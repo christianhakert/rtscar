@@ -48,7 +48,7 @@ void update_engs(){
     }
 }
 
-#define COLLISION_PRED 1
+#define COLLISION_PRED 3
 #include <math.h>
 
 void predict_collisions(){
@@ -60,7 +60,10 @@ void predict_collisions(){
     if (abs_angle<0){
         abs_angle*=-1;
     }
-    double r=s_speed*360.0/(2*PI*abs_angle);
+
+    double r=1000;
+    if(abs_angle!=0)
+        r=s_speed*360.0/(2*PI*abs_angle);
 
     for (int s=0;s<COLLISION_PRED;s++){
         x_offset[s]=r-r*cos((s+1)*abs_angle*PI/180.0);
@@ -82,25 +85,25 @@ void predict_collisions(){
         //Transform angle
         ang[s]=90-ang[s];
 
-        printf("Predicted collision point %d: %f, %f\n", s, ang[s], dist[s]);
+        // printf("Predicted collision point %d: %f, %f\n", s, ang[s], dist[s]);
     }
 
     //Now check if the predicted collision points are within the UDAR map
     for (int s=0;s<COLLISION_PRED;s++){
         int idx=(ang[s]+45)/SCAN_ANGLE_INTV;
         if (idx<0 || idx>=UDAR_MAP_SIZE){
-            printf("Collision prediction out of bounds\n");
+            // printf("Collision prediction out of bounds\n");
             continue;
         }
 
         double udar_dist=get_udar_map()[idx];
         udar_dist/=100; //cm
-        printf("UDAR dist is %f\n", udar_dist);
-        printf("Mydist is %f\n", dist[s]);
+        // printf("UDAR dist is %f\n", udar_dist);
+        // printf("Mydist is %f\n", dist[s]);
         printf("\n");
 
-        if (udar_dist<(dist[s]+0.04)){
-            brake_factor=1.0*s/COLLISION_PRED;
+        if (udar_dist<(dist[s]+0.2)){
+            brake_factor=1.0*(s+1)/(COLLISION_PRED);
             printf("Brake factor: %f\n", brake_factor);
             break;
         }
@@ -110,7 +113,7 @@ void predict_collisions(){
 
 void steering_task(){
     TickType_t xLastWakeTime=xTaskGetTickCount();
-    update_steering_input(90, -1);
+    // update_steering_input(90, -1);
     while(1){
         predict_collisions();
         update_engs();

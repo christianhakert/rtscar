@@ -1,0 +1,62 @@
+diff --git a/components/freertos/FreeRTOS-Kernel/include/freertos/FreeRTOS.h b/components/freertos/FreeRTOS-Kernel/include/freertos/FreeRTOS.h
+index 4df12a4..b7e68cd 100644
+--- a/components/freertos/FreeRTOS-Kernel/include/freertos/FreeRTOS.h
++++ b/components/freertos/FreeRTOS-Kernel/include/freertos/FreeRTOS.h
+@@ -1226,6 +1226,7 @@ typedef struct xSTATIC_TCB
+         xMPU_SETTINGS xDummy2;
+     #endif
+     StaticListItem_t xDummy3[ 2 ];
++    TickType_t edf_container;
+     UBaseType_t uxDummy5;
+     void * pxDummy6;
+     uint8_t ucDummy7[ configMAX_TASK_NAME_LEN ];
+diff --git a/components/freertos/FreeRTOS-Kernel/tasks.c b/components/freertos/FreeRTOS-Kernel/tasks.c
+index a647304..1aef9c0 100644
+--- a/components/freertos/FreeRTOS-Kernel/tasks.c
++++ b/components/freertos/FreeRTOS-Kernel/tasks.c
+@@ -161,7 +161,8 @@
+                                                                               \
+         /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of \
+          * the  same priority get an equal share of the processor time. */                         \
+-        listGET_OWNER_OF_NEXT_ENTRY( pxCurrentTCB[ 0 ], &( pxReadyTasksLists[ uxTopPriority ] ) ); \
++        /*listGET_OWNER_OF_NEXT_ENTRY( pxCurrentTCB[ 0 ], &( pxReadyTasksLists[ uxTopPriority ] ) ); */\
++        pxCurrentTCB[ 0 ]=listGET_OWNER_OF_HEAD_ENTRY(&( pxReadyTasksLists[ uxTopPriority ] ) ); \
+         uxTopReadyPriority = uxTopPriority;                                                        \
+     } /* taskSELECT_HIGHEST_PRIORITY_TASK */
+     #endif /* configNUM_CORES > 1 */
+@@ -230,6 +231,7 @@
+ 
+ /*-----------------------------------------------------------*/
+ 
++
+ /*
+  * Place the task represented by pxTCB into the appropriate ready list for
+  * the task.  It is inserted at the end of the list.
+@@ -237,7 +239,8 @@
+ #define prvAddTaskToReadyList( pxTCB )                                                                 \
+     traceMOVED_TASK_TO_READY_STATE( pxTCB );                                                           \
+     taskRECORD_READY_PRIORITY( ( pxTCB )->uxPriority );                                                \
+-    vListInsertEnd( &( pxReadyTasksLists[ ( pxTCB )->uxPriority ] ), &( ( pxTCB )->xStateListItem ) ); \
++    ( pxTCB )->xStateListItem.xItemValue=(pxTCB)->edf_container; \
++    vListInsert( &( pxReadyTasksLists[ ( pxTCB )->uxPriority ] ), &( ( pxTCB )->xStateListItem ) ); \
+     tracePOST_MOVED_TASK_TO_READY_STATE( pxTCB )
+ /*-----------------------------------------------------------*/
+ 
+@@ -350,6 +353,7 @@ typedef struct tskTaskControlBlock       /* The old naming convention is used to
+ 
+     ListItem_t xStateListItem;                  /*< The list that the state list item of a task is reference from denotes the state of that task (Ready, Blocked, Suspended ). */
+     ListItem_t xEventListItem;                  /*< Used to reference a task from an event list. */
++    TickType_t edf_container;
+     UBaseType_t uxPriority;                     /*< The priority of the task.  0 is the lowest priority. */
+     StackType_t * pxStack;                      /*< Points to the start of the stack. */
+     char pcTaskName[ configMAX_TASK_NAME_LEN ]; /*< Descriptive name given to the task when created.  Facilitates debugging only. */ /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+@@ -3769,7 +3773,7 @@ BaseType_t xTaskIncrementTick( void )
+                  * the pxIndex to point to the tail again. */
+                 pxReadyTasksLists[ uxCurPriority ].pxIndex = ( ListItem_t * ) &( pxReadyTasksLists[ uxCurPriority ].xListEnd );
+                 uxListRemove( &( pxTCBCur->xStateListItem ) );
+-                vListInsertEnd( &( pxReadyTasksLists[ uxCurPriority ] ), &( pxTCBCur->xStateListItem ) );
++                vListInsert( &( pxReadyTasksLists[ uxCurPriority ] ), &( pxTCBCur->xStateListItem ) );
+                 break;
+ 
+ get_next_task:
+ 

@@ -92,9 +92,44 @@ void readMacAddress() {
     }
 }
 
+void draw_motor(bool refresh) {
+    if (motor_on) {
+        if (initial) {
+            initial = false;
+            display.fillScreen(GxEPD_WHITE);
+        }
+        display.drawChar(180, 30, 'P', GxEPD_WHITE, GxEPD_WHITE, 1);
+        display.drawChar(180, 30, 'D', GxEPD_BLACK, GxEPD_WHITE, 1);
+        if (refresh) display.display(true);
+    } else {
+        display.drawChar(180, 30, 'D', GxEPD_WHITE, GxEPD_WHITE, 1);
+        display.drawChar(180, 30, 'P', GxEPD_BLACK, GxEPD_WHITE, 1);
+        if (refresh) display.display(true);
+    }
+}
+void draw_kaputt(bool refresh) {
+    if (kaputt) {
+        display.drawChar(0, 200, '!', GxEPD_BLACK, GxEPD_WHITE, 1);
+        if (refresh) display.display(true);
+    } else {
+        display.drawChar(0, 200, '!', GxEPD_WHITE, GxEPD_WHITE, 1);
+        if (refresh) display.display(true);
+    }
+}
+void draw_freedom(bool refresh) {
+    if (freedom) {
+        display.drawChar(180, 200, 'F', GxEPD_BLACK, GxEPD_WHITE, 1);
+        if (refresh) display.display(true);
+    } else {
+        display.drawChar(180, 200, 'F', GxEPD_WHITE, GxEPD_WHITE, 1);
+        if (refresh) display.display(true);
+    }
+}
+
 // callback function that will be executed when data is received
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len) {
     struct car2watch *data = (struct car2watch *)incomingData;
+    if (initial) return;
     if (data->magic != 0x42) {
         printf("Invalid magic number\n");
         return;
@@ -125,12 +160,9 @@ void map_task(void *pvParameters) {
             int car_y = 150;
             constexpr unsigned int scaling = 2;
             display.fillScreen(GxEPD_WHITE);
-            if (motor_on) {
-                display.fillRect(190, 10, 10, 30, GxEPD_BLACK);
-            }
-            if (kaputt) {
-                display.fillRect(0, 190, 20, 10, GxEPD_BLACK);
-            }
+            draw_motor(false);
+            draw_kaputt(false);
+            draw_freedom(false);
             display.fillCircle(car_x, car_y, 5, GxEPD_BLACK);
             for (size_t i = 0; i < 90 / angle_granularity + 1; i++) {
                 double angle = 45 + (double)i * (double)angle_granularity;
@@ -147,7 +179,7 @@ void map_task(void *pvParameters) {
             }
 
             display.display(true);
-            printf("udpated map\n");
+            printf("updated map\n");
         }
     }
 }
@@ -187,7 +219,7 @@ void accel_task(void *pvParameters) {
             } else {
                 direction = y / 1000 * 90;
             }
-            printf("%d, %f,(%d,%d,%d)\n", speed, direction, acc.x, acc.y, acc.z);
+            // printf("%d, %f,(%d,%d,%d)\n", speed, direction, acc.x, acc.y, acc.z);
 
             struct watch2car data;
             data.magic = 0x42;
@@ -201,53 +233,26 @@ void accel_task(void *pvParameters) {
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
-
+// motor: oben rechts
 void motor_task(void *pvParameters) {
     while (1) {
-        if (xSemaphoreTake(xSemaphoreMotorControl, portMAX_DELAY) == pdTRUE) {
-            if (motor_on) {
-                if (initial) {
-                    initial = false;
-                    display.fillScreen(GxEPD_WHITE);
-                }
-                printf("Motor on\n");
-                display.fillRect(190, 10, 10, 30, GxEPD_BLACK);
-                display.display(true);
-            } else {
-                printf("Motor off\n");
-                display.fillRect(190, 10, 10, 30, GxEPD_WHITE);
-                display.display(true);
-            }
-        }
+        if (xSemaphoreTake(xSemaphoreMotorControl, portMAX_DELAY) == pdTRUE)
+            draw_motor(true);
     }
 }
+// kaputt: unten links
 void kaputt_task(void *pvParameters) {
     while (1) {
         if (xSemaphoreTake(xSemaphoreKaputt, portMAX_DELAY) == pdTRUE) {
-            if (kaputt) {
-                printf("Kaputt on\n");
-                display.fillRect(0, 190, 20, 10, GxEPD_BLACK);
-                display.display(true);
-            } else {
-                printf("Kaputt off\n");
-                display.fillRect(0, 190, 20, 10, GxEPD_WHITE);
-                display.display(true);
-            }
+            draw_kaputt(true);
         }
     }
 }
+// freedom: unten rechts
 void freedom_task(void *pvParameters) {
     while (1) {
         if (xSemaphoreTake(xSemaphoreFreedom, portMAX_DELAY) == pdTRUE) {
-            if (freedom) {
-                printf("FREEDOM on\n");
-                display.fillRect(0, 10, 10, 30, GxEPD_BLACK);
-                display.display(true);
-            } else {
-                printf("FREEDOM off\n");
-                display.fillRect(0, 10, 10, 30, GxEPD_WHITE);
-                display.display(true);
-            }
+            draw_freedom(true);
         }
     }
 }

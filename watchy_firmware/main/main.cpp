@@ -13,9 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../interface.h"
 #include "espnow_example.h"
 #include "helper.h"
-#include "interface.h"
 #include "nvs_flash.h"
 
 GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> display(WatchyDisplay(DISPLAY_CS, DISPLAY_DC, DISPLAY_RES, DISPLAY_BUSY));
@@ -28,8 +28,10 @@ unsigned int angle_granularity;
 double udar_map[90];
 
 // esp_now_peer_info_t peerInfo;
-// 68:b6:b3:3e:34:e8
-uint8_t broadcastAddress[] = {0x68, 0xb6, 0xb3, 0x3e, 0x34, 0xe8};
+// car1: 68:b6:b3:3e:34:e8
+// uint8_t broadcastAddress[] = {0x68, 0xb6, 0xb3, 0x3e, 0x34, 0xe8};
+// car2: 68:b6:b3:3f:36:3c
+uint8_t broadcastAddress[] = {0x68, 0xb6, 0xb3, 0x3f, 0x36, 0x3c};
 
 bool initial = true;
 bool motor_on = false;

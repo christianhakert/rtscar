@@ -1,4 +1,5 @@
 esp-idf
 build
 watchy_firmware/esp/**
-managed_components
+managed_components/
+carfirmware/hello_world/managed_components/

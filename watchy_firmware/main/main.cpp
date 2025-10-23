@@ -15,7 +15,7 @@
 
 #include "espnow_example.h"
 #include "helper.h"
-#include "interface.h"
+#include "../../interface.h"
 #include "nvs_flash.h"
 
 GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> display(WatchyDisplay(DISPLAY_CS, DISPLAY_DC, DISPLAY_RES, DISPLAY_BUSY));
